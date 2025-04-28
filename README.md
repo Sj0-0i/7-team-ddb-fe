@@ -4,8 +4,8 @@
 돌핀(Dolphin)은 사용자 중심의 커뮤니티 플랫폼으로, 위치 기반 정보 공유와 소통을 통해 더 나은 사용자 경험을 제공합니다. 본 프로젝트는 React 기반의 프론트엔드 아키텍처를 사용하며, 모듈화된 구조와 최신 웹 기술을 적용하여 안정적이고 유지보수가 용이한 애플리케이션을 구현하고 있습니다.
 
 ## 팀 위키 
-- [서비스 위키 보러가기](https://github.com/orgs/7-team-ddb/wiki)
-- [서비스 칸반보드 보러가기](https://github.com/orgs/100-hours-a-week/projects/139)
+- [팀 위키 보러가기](https://github.com/100-hours-a-week/7-team-ddb-wiki/wiki)
+- [팀 칸반보드 보러가기](https://github.com/orgs/100-hours-a-week/projects/139)
 
 ## 목차 📑
 - [기술 스택 🛠️](#기술-스택-)
