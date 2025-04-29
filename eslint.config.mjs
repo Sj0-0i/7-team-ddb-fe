@@ -1,16 +1,55 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import js from '@eslint/js';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import pluginReact from 'eslint-plugin-react';
+import pluginImport from 'eslint-plugin-import';
+import { defineConfig } from 'eslint/config';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+export default defineConfig([
+  {
+    files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true },
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+    plugins: {
+      react: pluginReact,
+      import: pluginImport,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...pluginReact.configs.flat.recommended.rules,
 
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-];
+      'import/order': [
+        'error',
+        {
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            'parent',
+            'sibling',
+            'index',
+          ],
+          alphabetize: { order: 'asc' },
+          'newlines-between': 'always',
+        },
+      ],
+    },
+  },
 
-export default eslintConfig;
+  // TypeScript strict + stylistic configs
+  ...tseslint.configs.strict,
+  ...tseslint.configs.stylistic,
+]);
