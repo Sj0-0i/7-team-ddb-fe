@@ -25,7 +25,7 @@ const ACCEPTED_IMAGE_TYPES = [
 ];
 
 const profileSchema = z.object({
-  profileImage: z
+  profile_image: z
     .string()
     .optional()
     .refine(
@@ -49,7 +49,7 @@ const profileSchema = z.object({
         message: '프로필 사진은 .jpg, .jpeg, .png, .webp 확장자만 가능합니다.',
       },
     ),
-  nickname: z
+  username: z
     .string()
     .min(2, '2자 이상 입력해주세요')
     .max(10)
@@ -61,11 +61,13 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export interface ProfileFormProps {
-  defaultValues: Partial<ProfileFormValues>;
+  onSubmit: (data: ProfileFormValues) => void;
+  defaultValues?: Partial<ProfileFormValues>;
   buttonText?: string;
 }
 
 export function ProfileForm({
+  onSubmit,
   defaultValues,
   buttonText = '저장',
 }: ProfileFormProps) {
@@ -74,7 +76,11 @@ export function ProfileForm({
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues,
+    defaultValues: {
+      username: '',
+      introduction: '',
+      ...defaultValues,
+    },
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,14 +90,10 @@ export function ProfileForm({
       reader.onloadend = () => {
         const result = reader.result as string;
         setPreview(result);
-        form.setValue('profileImage', result);
+        form.setValue('profile_image', result);
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const onSubmit = (data: ProfileFormValues) => {
-    console.log('제출 데이터', data);
   };
 
   return (
@@ -105,10 +107,10 @@ export function ProfileForm({
             onClick={() => inputRef.current?.click()}
             className="h-32 w-32 cursor-pointer overflow-hidden rounded-full border-2 border-gray-300 bg-gray-200"
           >
-            {preview || defaultValues.profileImage ? (
+            {preview || defaultValues?.profile_image ? (
               <img
                 src={
-                  preview || (defaultValues.profileImage as unknown as string)
+                  preview || (defaultValues?.profile_image as unknown as string)
                 }
                 alt="프로필 이미지"
                 className="h-full w-full object-cover"
@@ -129,7 +131,7 @@ export function ProfileForm({
         </div>
         <FormField
           control={form.control}
-          name="nickname"
+          name="username"
           render={({ field }) => (
             <FormItem className="w-full">
               <FormLabel className="heading-2">닉네임</FormLabel>
@@ -157,7 +159,11 @@ export function ProfileForm({
             </FormItem>
           )}
         />
-        <Button type="submit" className="h-10 w-full">
+        <Button
+          type="submit"
+          className="h-10 w-full"
+          disabled={form.formState.isSubmitting}
+        >
           {buttonText}
         </Button>
       </form>

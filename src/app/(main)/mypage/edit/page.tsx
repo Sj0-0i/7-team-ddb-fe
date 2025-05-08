@@ -2,11 +2,25 @@
 
 import { useRouter } from 'next/navigation';
 
-import { mockUserProfile, ProfileForm } from '@/features/user';
+import { patchUser, ProfileForm, UserProfile, useUser } from '@/features/user';
 import { Header } from '@/shared/components';
 
 export default function MyPage() {
   const router = useRouter();
+  const { user } = useUser();
+
+  if (!user) {
+    return <div>로딩중...</div>;
+  }
+
+  const { username, profile_image, introduction } = user;
+  const handleSubmit = async (data: UserProfile) => {
+    await patchUser({
+      ...data,
+    });
+
+    router.push('/mypage');
+  };
 
   return (
     <>
@@ -16,7 +30,15 @@ export default function MyPage() {
         showBackButton
       />
       <div className="mt-12 flex flex-col items-center px-4">
-        <ProfileForm defaultValues={mockUserProfile} buttonText="수정하기" />
+        <ProfileForm
+          defaultValues={{
+            username,
+            profile_image,
+            introduction,
+          }}
+          buttonText="수정하기"
+          onSubmit={handleSubmit}
+        />
       </div>
     </>
   );
