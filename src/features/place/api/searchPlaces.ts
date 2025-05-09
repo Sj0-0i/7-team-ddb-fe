@@ -1,6 +1,6 @@
-// import { fetchApi } from '@/shared/lib/fetchApi';
-
 import { Place } from '../types';
+
+import { fetchApi } from '@/shared/lib/fetchApi';
 
 export interface SearchPlacesResponse {
   total: number;
@@ -19,7 +19,7 @@ export async function searchPlaces(
 ): Promise<SearchPlacesResponse> {
   try {
     console.group(params);
-    /*
+
     const queryParams = new URLSearchParams({
       lat: params.lat,
       lng: params.lng,
@@ -31,9 +31,7 @@ export async function searchPlaces(
       `/api/v1/places/search?${queryParams.toString()}`,
     );
 
-
     return response;
-    */
 
     return {
       total: 5,
