@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 import {
   Map,
@@ -34,7 +34,9 @@ export default function SearchPage() {
       // onMarkerClick={handleMarkerClick}
       />
       <div className="absolute top-0 left-0 z-10 flex w-full flex-col gap-5">
-        <SearchResultBar />
+        <Suspense fallback={<div>Loading...</div>}>
+          <SearchResultBar />
+        </Suspense>
         <button
           onClick={() => {
             setIsOpen((prev) => !prev);
