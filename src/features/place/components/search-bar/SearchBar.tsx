@@ -28,7 +28,7 @@ export function SearchBar({
 
     if (validatedQuery) {
       router.push(
-        `/search?q=${encodeURIComponent(validatedQuery)}&lat=${DEFAULT_LATITUDE}&lng=${DEFAULT_LONGITUDE}`,
+        `/search?query=${encodeURIComponent(validatedQuery)}&lat=${DEFAULT_LATITUDE}&lng=${DEFAULT_LONGITUDE}`,
       );
     }
   };
