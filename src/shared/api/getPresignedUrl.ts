@@ -1,15 +1,15 @@
 import { fetchApi } from '../lib/fetchApi';
 
 interface PresignedUrlRequestBody {
-  fileName: string;
-  contentType: string;
-  uploadType: 'profile';
+  file_name: string;
+  content_type: string;
+  upload_type: 'profile';
 }
 
 export interface PresignedUrlResponseData {
-  signedUrl: string;
-  objectUrl: string;
-  expiresIn: number;
+  signed_url: string;
+  object_url: string;
+  expires_in: number;
 }
 
 /**
@@ -26,9 +26,9 @@ export async function getPresignedUrl(
   uploadType: 'profile',
 ): Promise<PresignedUrlResponseData> {
   const requestBody: PresignedUrlRequestBody = {
-    fileName,
-    contentType,
-    uploadType,
+    file_name: fileName,
+    content_type: contentType,
+    upload_type: uploadType,
   };
 
   return fetchApi<PresignedUrlResponseData>('/api/v1/gcs/presigned-urls', {

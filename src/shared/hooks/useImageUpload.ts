@@ -34,7 +34,7 @@ export function useImageUpload(): UseImageUploadResult {
         uploadType,
       );
 
-      const uploadResponse = await fetch(presignedData.signedUrl, {
+      const uploadResponse = await fetch(presignedData.signed_url, {
         method: 'PUT',
         body: file,
         headers: {
@@ -48,9 +48,9 @@ export function useImageUpload(): UseImageUploadResult {
         );
       }
 
-      setUploadedObjectUrl(presignedData.objectUrl);
+      setUploadedObjectUrl(presignedData.object_url);
       setIsLoading(false);
-      return presignedData.objectUrl;
+      return presignedData.object_url;
     } catch (err) {
       console.error('이미지 업로드 중 에러 발생:', err);
       if (err instanceof FetchApiError || err instanceof Error) {
