@@ -5,7 +5,7 @@ pipeline {
         SERVICE_NAME    = 'fe'
         PROJECT_ID      = 'velvety-calling-458402-c1'
         REPO_NAME       = 'dolpin-docker-image-prod'
-        REGION          = 'asia-northeast3'
+        REGION          = 'asia'
         GAR_HOST        = 'asia-northeast3-docker.pkg.dev'
         CONTAINER_NAME  = 'frontend'
         PORT            = '3000'
