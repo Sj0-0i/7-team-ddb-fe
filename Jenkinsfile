@@ -43,11 +43,18 @@ pipeline {
 
         stage('Inject .env') {
             steps {
-                withCredentials([string(credentialsId: 'fe-env', variable: 'DOT_ENV')]) {
-                    writeFile file: '.env', text: DOT_ENV
+                withCredentials([
+                    string(credentialsId: 'NEXT_PUBLIC_API_BASE_PROD', variable: 'API_BASE_URL'),
+                    string(credentialsId: 'NEXT_PUBLIC_KAKAOMAP', variable: 'KAKAOMAP_KEY')
+                ]) {
+                    writeFile file: '.env', text: """\
+        NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL}
+        NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
+        """
                 }
             }
         }
+
 
         stage('GAR 인증') {
             steps {
