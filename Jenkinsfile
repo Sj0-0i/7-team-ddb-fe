@@ -4,8 +4,7 @@ pipeline {
     environment {
         SERVICE_NAME    = 'fe'
         PROJECT_ID      = 'velvety-calling-458402-c1'
-        REPO_NAME       = 'dolpin-docker-image-prod'
-        REGION          = 'asia'
+        REGION          = 'asia-northeast3'
         GAR_HOST        = 'asia-northeast3-docker.pkg.dev'
         CONTAINER_NAME  = 'frontend'
         PORT            = '3000'
@@ -22,9 +21,11 @@ pipeline {
                     if (branchName == 'main') {
                         env.FE_PRIVATE_IP = '10.10.20.2'
                         env.ENV_LABEL = 'prod'
+                        env.REPO_NAME = 'dolpin-docker-image-prod'
                     } else if (branchName == 'dev') {
-                        env.FE_PRIVATE_IP = '10.20.20.2'
+                        env.FE_PRIVATE_IP = '10.0.20.2'
                         env.ENV_LABEL = 'dev'
+                        env.REPO_NAME = 'dolpin-docker-image-dev'
                     } else {
                         error "⚠️ 지원되지 않는 브랜치입니다: ${branchName}"
                     }
@@ -43,14 +44,25 @@ pipeline {
 
         stage('Inject .env') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'NEXT_PUBLIC_API_BASE_PROD', variable: 'API_BASE_URL'),
-                    string(credentialsId: 'NEXT_PUBLIC_KAKAOMAP', variable: 'KAKAOMAP_KEY')
-                ]) {
-                    writeFile file: '.env', text: """\
-        NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL}
-        NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
-        """
+                script {
+                    def apiBaseCredId = ''
+                    if (env.BRANCH == 'main') {
+                        apiBaseCredId = 'NEXT_PUBLIC_API_BASE_PROD'
+                    } else if (env.BRANCH == 'dev') {
+                        apiBaseCredId = 'NEXT_PUBLIC_API_BASE_DEV'
+                    } else {
+                        error "지원하지 않는 브랜치입니다: ${env.BRANCH}"
+                    }
+
+                    withCredentials([
+                        string(credentialsId: apiBaseCredId, variable: 'API_BASE_URL'),
+                        string(credentialsId: 'NEXT_PUBLIC_KAKAOMAP_KEY', variable: 'KAKAOMAP_KEY')
+                    ]) {
+                        writeFile file: '.env', text: """\
+NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL}
+NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
+"""
+                    }
                 }
             }
         }
@@ -65,22 +77,9 @@ pipeline {
         stage('Docker Build & Push to GAR') {
             steps {
                 sh """
-                    docker build -t ${env.GAR_IMAGE} .
-                    docker push ${env.GAR_IMAGE}
+                    sudo docker build -t ${env.GAR_IMAGE} .
+                    sudo docker push ${env.GAR_IMAGE}
                 """
-            }
-        }
-
-        stage('Notify Deployment Started') {
-            steps {
-                withCredentials([string(credentialsId: 'discord-webhook-url', variable: 'WEBHOOK_URL')]) {
-                    sh """
-                    curl -H "Content-Type: application/json" -X POST -d '{
-                      "username": "Jenkins",
-                      "content": "🚀 [FE][${env.ENV_LABEL}] 배포 시작 – 태그: ${env.TAG}"
-                    }' $WEBHOOK_URL
-                    """
-                }
             }
         }
 
@@ -90,19 +89,19 @@ pipeline {
                     chmod 600 ${env.SSH_KEY_PATH}
                     scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no .env peter@${env.FE_PRIVATE_IP}:/home/peter/.env
 
-                    ssh -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no peter@${env.FE_PRIVATE_IP} << EOF
-                      set -e
-                      gcloud auth configure-docker ${env.GAR_HOST} --quiet
+ssh -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no peter@${env.FE_PRIVATE_IP} << 'EOF'
+set -e
+gcloud auth configure-docker ${env.GAR_HOST} --quiet
 
-                      docker stop ${env.CONTAINER_NAME} || true
-                      docker rm ${env.CONTAINER_NAME} || true
+sudo docker stop ${env.CONTAINER_NAME} || true
+sudo docker rm ${env.CONTAINER_NAME} || true
 
-                      docker pull ${env.GAR_IMAGE}
-                      docker run -d --name ${env.CONTAINER_NAME} \\
-                        --env-file /home/peter/.env \\
-                        -p ${env.PORT}:${env.PORT} \\
-                        ${env.GAR_IMAGE}
-                    EOF
+sudo docker pull ${env.GAR_IMAGE}
+sudo docker run -d --name ${env.CONTAINER_NAME} \\
+  --env-file /home/peter/.env \\
+  -p ${env.PORT}:${env.PORT} \\
+  ${env.GAR_IMAGE}
+EOF
                 """
             }
         }
