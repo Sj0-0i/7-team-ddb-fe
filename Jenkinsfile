@@ -23,7 +23,7 @@ pipeline {
                         env.ENV_LABEL = 'prod'
                         env.REPO_NAME = 'dolpin-docker-image-prod'
                     } else if (branchName == 'dev') {
-                        env.FE_PRIVATE_IP = '10.0.20.2'
+                        env.FE_PRIVATE_IP = '10.20.20.2'
                         env.ENV_LABEL = 'dev'
                         env.REPO_NAME = 'dolpin-docker-image-dev'
                     } else {
