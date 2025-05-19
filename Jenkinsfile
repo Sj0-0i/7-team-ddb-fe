@@ -77,8 +77,8 @@ NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
         stage('Docker Build & Push to GAR') {
             steps {
                 sh """
-                    sudo docker build -t ${env.GAR_IMAGE} .
-                    sudo docker push ${env.GAR_IMAGE}
+                    docker build -t ${env.GAR_IMAGE} .
+                    docker push ${env.GAR_IMAGE}
                 """
             }
         }
