@@ -85,10 +85,15 @@ NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
                         saCredId = 'fe-sa-key-dev'
                     }
 
-                    withCredentials([
-                        file(credentialsId: saCredId, variable: 'GCP_KEY')
-                    ]) {
-                        def deployScript = """
+                    // Secret Manager에서 서비스 계정 키 가져오기
+                    sh """
+                    gcloud secrets versions access latest \
+                    --secret="${saCredId}" \
+                    --project="${env.PROJECT_ID}" > gcp-key.json
+                    """
+
+                    
+                    def deployScript = """
 #!/bin/bash
 set -e
 
@@ -98,18 +103,14 @@ chown ${env.SSH_USER}:${env.SSH_USER} /home/${env.SSH_USER}/.env /home/${env.SSH
 chmod 600 /home/${env.SSH_USER}/.env /home/${env.SSH_USER}/gcp-key.json
 
 export HOME=/home/${env.SSH_USER}
-echo "\$HOME = \$HOME"
-ls -la \$HOME/.docker || true
-cat \$HOME/.docker/config.json || echo "No config file"
 
 gcloud auth activate-service-account --key-file="\$HOME/gcp-key.json"
 gcloud config set project ${env.PROJECT_ID} --quiet
 gcloud auth configure-docker ${env.GAR_HOST} --quiet
-echo '{}' > \$HOME/.docker/config.json
 gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://${env.GAR_HOST}
 
-docker stop ${env.CONTAINER_NAME} || true
-docker rm ${env.CONTAINER_NAME} || true
+sudo docker stop ${env.CONTAINER_NAME} || true
+sudo docker rm ${env.CONTAINER_NAME} || true
 
 docker pull ${env.GAR_IMAGE}
 
@@ -119,19 +120,17 @@ sudo docker run -d --name ${env.CONTAINER_NAME} \\
   ${env.GAR_IMAGE}
 """
 
-                        writeFile file: 'deploy.sh', text: deployScript
-                        echo "==== deploy.sh 내용 출력 ===="
-                        sh "cat deploy.sh"
+                    writeFile file: 'deploy.sh', text: deployScript
+                    sh "chmod 600 ${env.SSH_KEY_PATH}"
 
-                        sh """
+                    sh """
 chmod 600 ${env.SSH_KEY_PATH}
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no .env ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/.env
-scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no \$GCP_KEY ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/gcp-key.json
+scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no gcp-key.json ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/gcp-key.json
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no deploy.sh ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/deploy.sh
 
 ssh -tt -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no ${env.SSH_USER}@${env.FE_PRIVATE_IP} "bash /tmp/deploy.sh"
 """
-                    }
                 }
             }
         }
