@@ -46,19 +46,20 @@ pipeline {
             }
         }
 
-        stage('Inject .env') {
+        stage('Load Secrets') {
             steps {
-                withCredentials([
-                    string(credentialsId: "${env.API_BASE_CRED_ID}", variable: 'API_BASE_URL'),
-                    string(credentialsId: 'NEXT_PUBLIC_KAKAOMAP_KEY', variable: 'KAKAOMAP_KEY')
-                ]) {
-                    writeFile file: '.env', text: """\
-NEXT_PUBLIC_API_BASE_URL=${API_BASE_URL}
-NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
-"""
+                script {
+                    withCredentials([
+                        string(credentialsId: "${env.API_BASE_CRED_ID}", variable: 'API_BASE_URL'),
+                        string(credentialsId: 'NEXT_PUBLIC_KAKAOMAP_KEY', variable: 'KAKAOMAP_KEY')
+                    ]) {
+                        env.API_BASE_URL = API_BASE_URL
+                        env.KAKAOMAP_KEY = KAKAOMAP_KEY
+                    }
                 }
             }
         }
+
 
         stage('GAR 인증') {
             steps {
@@ -69,7 +70,10 @@ NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
         stage('Docker Build & Push to GAR') {
             steps {
                 sh """
-                    docker build -t ${env.GAR_IMAGE} .
+                    docker build \
+                      --build-arg NEXT_PUBLIC_API_BASE_URL=${env.API_BASE_URL} \
+                      --build-arg NEXT_PUBLIC_KAKAOMAP_KEY=${env.KAKAOMAP_KEY} \
+                      -t ${env.GAR_IMAGE} .
                     docker push ${env.GAR_IMAGE}
                 """
             }
@@ -78,31 +82,23 @@ NEXT_PUBLIC_KAKAOMAP_KEY=${KAKAOMAP_KEY}
         stage('Deploy to FE via SSH') {
             steps {
                 script {
-                    def saCredId = ''
-                    if (env.BRANCH == 'main') {
-                        saCredId = 'fe-sa-key-prod'
-                    } else if (env.BRANCH == 'dev') {
-                        saCredId = 'fe-sa-key-dev'
-                    }
+                    def saCredId = env.BRANCH == 'main' ? 'fe-sa-key-prod' : 'fe-sa-key-dev'
 
-                    // Secret Manager에서 서비스 계정 키 가져오기
                     sh """
                     gcloud secrets versions access latest \
                     --secret="${saCredId}" \
                     --project="${env.PROJECT_ID}" > gcp-key.json
                     """
 
-                    
                     def deployScript = """
 #!/bin/bash
 set -e
 
-mv /tmp/.env /home/${env.SSH_USER}/.env
-mv /tmp/gcp-key.json /home/${env.SSH_USER}/gcp-key.json
-chown ${env.SSH_USER}:${env.SSH_USER} /home/${env.SSH_USER}/.env /home/${env.SSH_USER}/gcp-key.json
-chmod 600 /home/${env.SSH_USER}/.env /home/${env.SSH_USER}/gcp-key.json
-
 export HOME=/home/${env.SSH_USER}
+
+mv /tmp/gcp-key.json \$HOME/gcp-key.json
+chown ${env.SSH_USER}:${env.SSH_USER} \$HOME/gcp-key.json
+chmod 600 \$HOME/gcp-key.json
 
 gcloud auth activate-service-account --key-file="\$HOME/gcp-key.json"
 gcloud config set project ${env.PROJECT_ID} --quiet
@@ -115,7 +111,6 @@ sudo docker rm ${env.CONTAINER_NAME} || true
 docker pull ${env.GAR_IMAGE}
 
 sudo docker run -d --name ${env.CONTAINER_NAME} \\
-  --env-file \$HOME/.env \\
   -p ${env.PORT}:${env.PORT} \\
   ${env.GAR_IMAGE}
 """
@@ -124,8 +119,6 @@ sudo docker run -d --name ${env.CONTAINER_NAME} \\
                     sh "chmod 600 ${env.SSH_KEY_PATH}"
 
                     sh """
-chmod 600 ${env.SSH_KEY_PATH}
-scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no .env ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/.env
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no gcp-key.json ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/gcp-key.json
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no deploy.sh ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/deploy.sh
 
