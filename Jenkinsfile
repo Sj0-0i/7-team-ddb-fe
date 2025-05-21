@@ -59,8 +59,7 @@ pipeline {
                 }
             }
         }
-
-
+        
         stage('GAR 인증') {
             steps {
                 sh "gcloud auth configure-docker ${env.GAR_HOST} --quiet"
@@ -84,12 +83,14 @@ pipeline {
                 script {
                     def saCredId = env.BRANCH == 'main' ? 'fe-sa-key-prod' : 'fe-sa-key-dev'
 
+                    // Secret Manager에서 서비스 계정 키 가져오기
                     sh """
                     gcloud secrets versions access latest \
                     --secret="${saCredId}" \
                     --project="${env.PROJECT_ID}" > gcp-key.json
                     """
 
+                    
                     def deployScript = """
 #!/bin/bash
 set -e
@@ -105,10 +106,35 @@ gcloud config set project ${env.PROJECT_ID} --quiet
 gcloud auth configure-docker ${env.GAR_HOST} --quiet
 gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://${env.GAR_HOST}
 
+NEW_CONTAINER_NAME="${env.CONTAINER_NAME}-new"
+EXTERNAL_PORT=\$((${env.PORT} + 1))
+
+docker pull ${env.GAR_IMAGE}
+
+sudo docker run -d --name \$NEW_CONTAINER_NAME \\
+  -p \$EXTERNAL_PORT:${env.PORT} \\
+  ${env.GAR_IMAGE}
+
+echo "Health check for new container..."
+for i in {1..20}; do
+  sleep 3
+  if curl -s "http://localhost:\$EXTERNAL_PORT/api/health" | grep -iq "ok"; then
+    echo "New container is healthy."
+    break
+  fi
+  echo "Waiting for container... (\$i)"
+  if [ "\$i" -eq 20 ]; then
+    echo "New container failed health check."
+    sudo docker rm -f \$NEW_CONTAINER_NAME
+    exit 1
+  fi
+done
+
 sudo docker stop ${env.CONTAINER_NAME} || true
 sudo docker rm ${env.CONTAINER_NAME} || true
 
-docker pull ${env.GAR_IMAGE}
+sudo docker stop \$NEW_CONTAINER_NAME || true
+sudo docker rm \$NEW_CONTAINER_NAME || true
 
 sudo docker run -d --name ${env.CONTAINER_NAME} \\
   -p ${env.PORT}:${env.PORT} \\
@@ -119,6 +145,7 @@ sudo docker run -d --name ${env.CONTAINER_NAME} \\
                     sh "chmod 600 ${env.SSH_KEY_PATH}"
 
                     sh """
+chmod 600 ${env.SSH_KEY_PATH}
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no gcp-key.json ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/gcp-key.json
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no deploy.sh ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/deploy.sh
 
