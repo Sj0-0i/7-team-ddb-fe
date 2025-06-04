@@ -20,36 +20,18 @@ pipeline {
                     env.BRANCH = branchName
 
                     if (branchName == 'main') {
-                        properties([pipelineTriggers([cron('30 0 * * 1-5')])])
+                        properties([pipelineTriggers([cron('40 0 * * 1-5')])])
                     } else if (branchName == 'dev') {
                         properties([pipelineTriggers([
-                            cron('30 3 * * 1-4'),
-                            cron('0 1 * * 5'),
-                            cron('30 3 * * 6,7')
+                            cron('40 3 * * 1-4'),
+                            cron('40 23 * * 4'),
+                            cron('40 3 * * 6,7')
                         ])])
                     } else {
                         properties([pipelineTriggers([])])
                         echo "⛔ 지원되지 않는 브랜치입니다: ${branchName}. 빌드를 중단합니다."
                         currentBuild.result = 'NOT_BUILT'
                         error("Unsupported branch: ${branchName}")
-                    }
-                }
-            }
-        }
-
-        stage('Notify Before Start') {
-            when {
-                expression { env.BRANCH in ['main', 'dev'] }
-            }
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-                        discordSend(
-                            description: "🚀 배포가 곧 시작됩니다: ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치",
-                            link: env.BUILD_URL,
-                            title: "배포 시작",
-                            webhookURL: "$DISCORD"
-                        )
                     }
                 }
             }
@@ -82,6 +64,61 @@ pipeline {
             }
         }
 
+        stage('Check Infrastructure Availability') {
+            steps {
+                script {
+                    def sshStatus = sh(
+                        script: """
+                        ssh -i ${env.SSH_KEY_PATH} \
+                            -o BatchMode=yes \
+                            -o ConnectTimeout=15 \
+                            -o StrictHostKeyChecking=no \
+                            ${env.SSH_USER}@${env.FE_PRIVATE_IP} 'echo connected' >/dev/null 2>&1
+                        """,
+                        returnStatus: true
+                    )
+
+                    if (sshStatus != 0) {
+                        withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+                            discordSend(
+                                description: """
+                                ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치 배포 중단됨
+                                이유: SSH 연결 실패 - ${env.FE_PRIVATE_IP}
+                                빌드 URL: ${env.BUILD_URL}
+                                """,
+                                link: env.BUILD_URL,
+                                result: 'FAILURE',
+                                title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패 - 인프라 미구성",
+                                webhookURL: "$DISCORD"
+                            )
+                        }
+                        currentBuild.result = 'ABORTED'
+                        error("SSH connection failed. Infra not ready.")
+                    } else {
+                        echo "SSH 연결 성공: 인프라 확인 완료."
+                    }
+                }
+            }
+        }
+
+        stage('Notify Before Start') {
+            when {
+                expression { env.BRANCH in ['main', 'dev'] }
+            }
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+                        discordSend(
+                            description: "🚀 배포가 곧 시작됩니다: ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치",
+                            link: env.BUILD_URL,
+                            title: "배포 시작",
+                            webhookURL: "$DISCORD"
+                        )
+                    }
+                }
+            }
+        }
+
         stage('Load Secrets') {
             steps {
                 script {
@@ -96,7 +133,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('GAR 인증') {
             steps {
