@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SERVICE_NAME    = 'fe'
+        SERVICE_NAME    = 'frontend'
         PROJECT_ID      = 'velvety-calling-458402-c1'
         REGION          = 'asia-northeast3'
         GAR_HOST        = 'asia-northeast3-docker.pkg.dev'
@@ -13,29 +13,26 @@ pipeline {
     }
 
     stages {
-        stage('Set Environment by Branch') {
+        stage('Set Branch & Cron Trigger') {
             steps {
                 script {
-                    def branchName = env.GIT_BRANCH.replaceFirst(/^origin\//, '')
+                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH?.replaceFirst(/^origin\//, '')
                     env.BRANCH = branchName
-                    echo "현재 브랜치: ${branchName}"
 
                     if (branchName == 'main') {
-                        env.FE_PRIVATE_IP = '10.10.20.2'
-                        env.ENV_LABEL = 'prod'
-                        env.REPO_NAME = 'dolpin-docker-image-prod'
-                        env.API_BASE_CRED_ID = 'NEXT_PUBLIC_API_BASE_PROD'
+                        properties([pipelineTriggers([cron('40 0 * * 1-5')])])
                     } else if (branchName == 'dev') {
-                        env.FE_PRIVATE_IP = '10.20.20.2'
-                        env.ENV_LABEL = 'dev'
-                        env.REPO_NAME = 'dolpin-docker-image-dev'
-                        env.API_BASE_CRED_ID = 'NEXT_PUBLIC_API_BASE_DEV'
+                        properties([pipelineTriggers([
+                            cron('40 3 * * 1-4'),
+                            cron('40 23 * * 4'),
+                            cron('40 3 * * 6,7')
+                        ])])
                     } else {
-                        error "지원되지 않는 브랜치입니다: ${branchName}"
+                        properties([pipelineTriggers([])])
+                        echo "⛔ 지원되지 않는 브랜치입니다: ${branchName}. 빌드를 중단합니다."
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Unsupported branch: ${branchName}")
                     }
-
-                    env.TAG = "${env.SERVICE_NAME}:${env.BUILD_NUMBER}"
-                    env.GAR_IMAGE = "${env.GAR_HOST}/${env.PROJECT_ID}/${env.REPO_NAME}/${env.TAG}"
                 }
             }
         }
@@ -46,9 +43,86 @@ pipeline {
             }
         }
 
+        stage('Set Environment by Branch') {
+            steps {
+                script {
+                    if (env.BRANCH == 'main') {
+                        env.FE_PRIVATE_IP = '10.10.20.2'
+                        env.ENV_LABEL = 'prod'
+                        env.REPO_NAME = 'dolpin-docker-image-prod'
+                        env.API_BASE_CRED_ID = 'NEXT_PUBLIC_API_BASE_PROD'
+                    } else {
+                        env.FE_PRIVATE_IP = '10.20.20.2'
+                        env.ENV_LABEL = 'dev'
+                        env.REPO_NAME = 'dolpin-docker-image-dev'
+                        env.API_BASE_CRED_ID = 'NEXT_PUBLIC_API_BASE_DEV'
+                    } 
+
+                    env.TAG = "${env.SERVICE_NAME}:${env.BUILD_NUMBER}"
+                    env.GAR_IMAGE = "${env.GAR_HOST}/${env.PROJECT_ID}/${env.REPO_NAME}/${env.TAG}"
+                }
+            }
+        }
+
+        stage('Check Infrastructure Availability') {
+            steps {
+                script {
+                    def sshStatus = sh(
+                        script: """
+                        ssh -i ${env.SSH_KEY_PATH} \
+                            -o BatchMode=yes \
+                            -o ConnectTimeout=15 \
+                            -o StrictHostKeyChecking=no \
+                            ${env.SSH_USER}@${env.FE_PRIVATE_IP} 'echo connected' >/dev/null 2>&1
+                        """,
+                        returnStatus: true
+                    )
+
+                    if (sshStatus != 0) {
+                        withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+                            discordSend(
+                                description: """
+                                ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치 배포 중단됨
+                                이유: SSH 연결 실패 - ${env.FE_PRIVATE_IP}
+                                빌드 URL: ${env.BUILD_URL}
+                                """,
+                                link: env.BUILD_URL,
+                                result: 'FAILURE',
+                                title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패 - 인프라 미구성",
+                                webhookURL: "$DISCORD"
+                            )
+                        }
+                        currentBuild.result = 'ABORTED'
+                        error("SSH connection failed. Infra not ready.")
+                    } else {
+                        echo "SSH 연결 성공: 인프라 확인 완료."
+                    }
+                }
+            }
+        }
+
+        stage('Notify Before Start') {
+            when {
+                expression { env.BRANCH in ['main', 'dev'] }
+            }
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+                        discordSend(
+                            description: "🚀 배포가 곧 시작됩니다: ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치",
+                            link: env.BUILD_URL,
+                            title: "배포 시작",
+                            webhookURL: "$DISCORD"
+                        )
+                    }
+                }
+            }
+        }
+
         stage('Load Secrets') {
             steps {
                 script {
+                    // Jenkins Credential Plugin을 통해 환경변수 로드
                     withCredentials([
                         string(credentialsId: "${env.API_BASE_CRED_ID}", variable: 'API_BASE_URL'),
                         string(credentialsId: 'NEXT_PUBLIC_KAKAOMAP_KEY', variable: 'KAKAOMAP_KEY')
@@ -59,7 +133,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('GAR 인증') {
             steps {
                 sh "gcloud auth configure-docker ${env.GAR_HOST} --quiet"
@@ -83,14 +157,13 @@ pipeline {
                 script {
                     def saCredId = env.BRANCH == 'main' ? 'fe-sa-key-prod' : 'fe-sa-key-dev'
 
-                    // Secret Manager에서 서비스 계정 키 가져오기
+                    // GCP Secret Manager에서 서비스 계정 키 다운로드
                     sh """
                     gcloud secrets versions access latest \
                     --secret="${saCredId}" \
                     --project="${env.PROJECT_ID}" > gcp-key.json
                     """
 
-                    
                     def deployScript = """
 #!/bin/bash
 set -e
@@ -101,56 +174,67 @@ mv /tmp/gcp-key.json \$HOME/gcp-key.json
 chown ${env.SSH_USER}:${env.SSH_USER} \$HOME/gcp-key.json
 chmod 600 \$HOME/gcp-key.json
 
+# 서비스 계정 인증 및 docker 인증
 gcloud auth activate-service-account --key-file="\$HOME/gcp-key.json"
 gcloud config set project ${env.PROJECT_ID} --quiet
 gcloud auth configure-docker ${env.GAR_HOST} --quiet
 gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://${env.GAR_HOST}
 
-NEW_CONTAINER_NAME="${env.CONTAINER_NAME}-new"
-EXTERNAL_PORT=\$((${env.PORT} + 1))
-
-docker pull ${env.GAR_IMAGE}
-
-sudo docker run -d --name \$NEW_CONTAINER_NAME \\
-  -p \$EXTERNAL_PORT:${env.PORT} \\
-  ${env.GAR_IMAGE}
-
-echo "Health check for new container..."
-for i in {1..20}; do
-  sleep 3
-  if curl -s "http://localhost:\$EXTERNAL_PORT/api/health" | grep -iq "ok"; then
-    echo "New container is healthy."
-    break
-  fi
-  echo "Waiting for container... (\$i)"
-  if [ "\$i" -eq 20 ]; then
-    echo "New container failed health check."
-    sudo docker rm -f \$NEW_CONTAINER_NAME
-    exit 1
-  fi
-done
-
 sudo docker stop ${env.CONTAINER_NAME} || true
 sudo docker rm ${env.CONTAINER_NAME} || true
 
-sudo docker stop \$NEW_CONTAINER_NAME || true
-sudo docker rm \$NEW_CONTAINER_NAME || true
+docker pull ${env.GAR_IMAGE}
 
 sudo docker run -d --name ${env.CONTAINER_NAME} \\
   -p ${env.PORT}:${env.PORT} \\
   ${env.GAR_IMAGE}
 """
-
+                    // Jenkins 워크스페이스에 배포 스크립트 파일 저장
                     writeFile file: 'deploy.sh', text: deployScript
                     sh "chmod 600 ${env.SSH_KEY_PATH}"
-
+                    
+                    // 키와 스크립트 전송 후 실행
                     sh """
-chmod 600 ${env.SSH_KEY_PATH}
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no gcp-key.json ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/gcp-key.json
 scp -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no deploy.sh ${env.SSH_USER}@${env.FE_PRIVATE_IP}:/tmp/deploy.sh
 
 ssh -tt -i ${env.SSH_KEY_PATH} -o StrictHostKeyChecking=no ${env.SSH_USER}@${env.FE_PRIVATE_IP} "bash /tmp/deploy.sh"
 """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                if (env.BRANCH in ['main', 'dev']) {
+                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+                        discordSend description: """
+                        제목 : ${currentBuild.displayName}
+                        결과 : ${currentBuild.result}
+                        실행 시간 : ${currentBuild.duration / 1000}s
+                        """,
+                        link: env.BUILD_URL, result: currentBuild.currentResult,
+                        title: "${env.JOB_NAME} : ${currentBuild.displayName} 성공",
+                        webhookURL: "$DISCORD"
+                    }
+                }
+            }
+        }
+        failure {
+            script {
+                if (env.BRANCH in ['main', 'dev']) {
+                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+                        discordSend description: """
+                        제목 : ${currentBuild.displayName}
+                        결과 : ${currentBuild.result}
+                        실행 시간 : ${currentBuild.duration / 1000}s
+                        """,
+                        link: env.BUILD_URL, result: currentBuild.currentResult,
+                        title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패",
+                        webhookURL: "$DISCORD"
+                    }
                 }
             }
         }

@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_LATITUDE, DEFAULT_LONGITUDE } from '../../constants';
+import { usePlaceToast } from '../../hooks';
+import { useBottomSheetStore } from '../../stores';
 import { Place } from '../../types';
-import { createPlaceMarkers, initializeMap } from '../../utils';
-import { PlaceBottomSheet } from '../place-bottom-sheet';
+import {
+  createPlaceMarkers,
+  initializeMap,
+  resetSelectedMarker,
+} from '../../utils';
+import { PlacePinBottomSheet } from '../place-pin-bottom-sheet';
 
 import { loadKakaoMapScript } from '@/shared/lib/map';
 
@@ -14,16 +20,27 @@ export interface MapProps {
 }
 
 export function Map({ places }: MapProps) {
+  const { showToast } = usePlaceToast();
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
-  const [selectedPlaceForSheet, setSelectedPlaceForSheet] =
-    useState<Place | null>(null);
+
+  const lastPlaceId = useBottomSheetStore((state) => state.lastPlaceId);
+  const setOpened = useBottomSheetStore((state) => state.setOpened);
+  const setLastPlaceId = useBottomSheetStore((state) => state.setLastPlaceId);
 
   const handleMarkerClickForSheet = (place: Place) => {
-    setSelectedPlaceForSheet(place);
-    setIsBottomSheetOpen(true);
+    setOpened('pin');
+    setLastPlaceId(place.id);
   };
+
+  const handleCloseBottomSheet = useCallback(() => {
+    setOpened('list');
+    resetSelectedMarker();
+  }, [setOpened]);
+
+  const handleOutOfBounds = useCallback(() => {
+    showToast('지도 영역을 벗어났습니다.');
+  }, [showToast]);
 
   useEffect(() => {
     loadKakaoMapScript(() => {
@@ -35,6 +52,7 @@ export function Map({ places }: MapProps) {
               mapContainer,
               DEFAULT_LATITUDE,
               DEFAULT_LONGITUDE,
+              handleOutOfBounds,
             );
             mapRef.current = initializedMap;
             setIsMapLoaded(true);
@@ -65,10 +83,9 @@ export function Map({ places }: MapProps) {
         className="absolute inset-0 z-0 h-full w-full"
         style={{ minHeight: '100svh' }}
       />
-      <PlaceBottomSheet
-        isOpen={isBottomSheetOpen}
-        onOpenChange={setIsBottomSheetOpen}
-        place={selectedPlaceForSheet}
+      <PlacePinBottomSheet
+        onOpenChange={handleCloseBottomSheet}
+        place={places.find((place) => place.id === lastPlaceId) || null}
       />
     </>
   );
