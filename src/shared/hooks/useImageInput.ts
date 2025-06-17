@@ -36,6 +36,7 @@ export function useImageInput<T extends FieldValues>({
     defaultImage,
   );
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [hasSelectedFile, setHasSelectedFile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -57,6 +58,7 @@ export function useImageInput<T extends FieldValues>({
     if (files.length === 0) {
       setSelectedFiles([]);
       setPreview(defaultImage);
+      setHasSelectedFile(false);
       return;
     }
 
@@ -89,10 +91,12 @@ export function useImageInput<T extends FieldValues>({
     if (validationError) {
       setSelectedFiles([]);
       setPreview(defaultImage);
+      setHasSelectedFile(false);
       return;
     }
 
     setSelectedFiles(files);
+    setHasSelectedFile(true);
 
     const newPreviews = files.map((file) => URL.createObjectURL(file));
     setPreview(multiple ? newPreviews : newPreviews[0]);
@@ -163,6 +167,7 @@ export function useImageInput<T extends FieldValues>({
     inputRef,
     acceptedTypes,
     multiple,
+    hasSelectedFile,
     handleImageChange,
     triggerInput,
     upload,
