@@ -10,13 +10,13 @@ import {
 } from '../../hooks';
 import { useBottomSheetStore } from '../../stores';
 import { Place } from '../../types';
-import { PlaceItem } from '../place-item';
+import { PlaceList } from '../place-list';
 
-export interface PlaceListProps {
+export interface PlaceListBottomSheetProps {
   places: Place[];
 }
 
-export function PlaceListBottomSheet({ places }: PlaceListProps) {
+export function PlaceListBottomSheet({ places }: PlaceListBottomSheetProps) {
   const { opened, prevSnap, scrollY, setPrevSnap, setScrollY } =
     useBottomSheetStore();
 
@@ -59,20 +59,7 @@ export function PlaceListBottomSheet({ places }: PlaceListProps) {
             onScroll={handleScroll}
             className="my-10 flex-1 overflow-y-auto px-4 pb-10"
           >
-            <div className="space-y-8">
-              {places.map((place) => (
-                <div key={place.id} className="border-b border-zinc-200 pb-8">
-                  <PlaceItem
-                    key={place.id}
-                    id={place.id}
-                    name={place.name}
-                    thumbnail={place.thumbnail}
-                    keywords={place.keywords}
-                    isClickable
-                  />
-                </div>
-              ))}
-            </div>
+            <PlaceList places={places} />
           </div>
         </Drawer.Content>
       </Drawer.Portal>

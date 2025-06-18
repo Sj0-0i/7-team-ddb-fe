@@ -15,7 +15,15 @@ export interface Place {
   moment_count: string;
   keywords: string[];
   location: Location;
+  is_bookmarked: boolean;
 }
+
+export type PlaceListType = PlaceItemType[];
+
+export type PlaceItemType = Pick<
+  Place,
+  'id' | 'name' | 'thumbnail' | 'keywords' | 'is_bookmarked'
+>;
 
 export interface PlaceDetail {
   id: number;
@@ -31,6 +39,7 @@ export interface PlaceDetail {
   phone: string | null;
   menu?: Menu[];
   opening_hours: OpenHours;
+  is_bookmarked: boolean;
 }
 
 export interface OpenHours {

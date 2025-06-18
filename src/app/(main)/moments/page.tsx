@@ -1,12 +1,25 @@
-import { Header } from '@/shared/components';
+import { cookies } from 'next/headers';
 
-export default function Moments() {
+import {
+  getMoments,
+  INFINITE_SCROLL,
+  MomentList,
+  WriteMomentFab,
+} from '@/features/community';
+
+export default async function Moments() {
+  const cookie = (await cookies()).toString();
+  const moments = await getMoments({
+    limit: INFINITE_SCROLL.MOMENTS_PER_PAGE,
+    cursor: null,
+    type: 'all',
+    cookie,
+  });
+
   return (
-    <>
-      <Header title="다이어리" />
-      <div className="flex h-[calc(100svh-64px)] items-center justify-center text-center text-gray-500">
-        곧 여러분을 찾아갈 새로운 기능을 준비 중이에요!
-      </div>
-    </>
+    <div className="h-full overflow-y-auto pb-22">
+      <MomentList initialMoments={moments} type="all" />
+      <WriteMomentFab />
+    </div>
   );
 }

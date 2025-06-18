@@ -1,70 +1,59 @@
-'use client';
+import { cookies } from 'next/headers';
 
-import { useRouter } from 'next/navigation';
+import { getMoments, INFINITE_SCROLL, MomentList } from '@/features/community';
+import { getBookmarks, PlaceList } from '@/features/place';
+import {
+  getUser,
+  Profile,
+  ProfileSettingsSheet,
+  ProfileTabs,
+} from '@/features/user';
+import { FullScreenMessage, Header } from '@/shared/components';
 
-import { Profile, useUser } from '@/features/user';
-import { logout } from '@/features/user/api/logout';
-import { Header } from '@/shared/components';
-
-export default function MyPage() {
-  const router = useRouter();
-  const { user } = useUser();
+export default async function MyPage() {
+  const cookie = (await cookies()).toString();
+  const user = await getUser(cookie);
 
   if (!user) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        로딩중...
-      </div>
-    );
+    return <FullScreenMessage message="로딩중..." />;
   }
 
   const { username, profile_image, introduction } = user;
 
-  const handleEdit = () => {
-    router.push('/mypage/edit');
-  };
-
-  const handleWithdraw = () => {
-    router.push('/mypage/delete');
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push('/onboarding');
-    } catch (error) {
-      console.error('로그아웃 실패:', error);
-    }
-  };
+  const moments = await getMoments({
+    limit: INFINITE_SCROLL.MOMENTS_PER_PAGE,
+    cursor: null,
+    type: 'my',
+    cookie,
+  });
+  const { bookmarks } = await getBookmarks({
+    cookie,
+  });
 
   return (
-    <>
-      <Header title="마이페이지" />
-      <div className="mt-12 flex flex-col items-center px-4">
+    <div className="flex h-full flex-col">
+      <div className="mobile-width z-30 flex w-full flex-shrink-0">
+        <Header rightElement={<ProfileSettingsSheet />} />
+      </div>
+      <main className="flex-grow overflow-y-auto pb-22">
         <Profile
           username={username}
-          profile_image={profile_image ?? ''}
+          profileImage={profile_image ?? ''}
           introduction={introduction ?? ''}
         />
-        <button
-          onClick={handleEdit}
-          className="button-text mb-4 w-1/2 rounded-full bg-rose-100 px-4 py-2 text-gray-800 transition-colors hover:bg-rose-200"
-        >
-          회원정보 수정
-        </button>
-        <button
-          onClick={handleLogout}
-          className="button-text mb-4 w-1/2 rounded-full bg-gray-100 px-4 py-2 text-gray-800 transition-colors hover:bg-gray-200"
-        >
-          로그아웃
-        </button>
-        <button
-          onClick={handleWithdraw}
-          className="text-xs text-gray-400 transition-colors hover:text-gray-600"
-        >
-          회원 탈퇴하기
-        </button>
-      </div>
-    </>
+        <div className="flex flex-col items-center px-4 pt-4">
+          <ProfileTabs
+            momentContent={
+              moments.items.length > 0 ? (
+                <MomentList initialMoments={moments} type="my" />
+              ) : null
+            }
+            bookmarkContent={
+              bookmarks.length > 0 ? <PlaceList places={bookmarks} /> : null
+            }
+          />
+        </div>
+      </main>
+    </div>
   );
 }

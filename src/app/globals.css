@@ -78,6 +78,13 @@ body {
   overflow-x: hidden;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   transition: max-width 0.3s ease-in-out;
+  word-break: break-all;
+}
+
+.mobile-width {
+  width: 100%;
+  max-width: 430px;
+  min-width: 375px;
 }
 
 /* UI 컴포넌트 클래스 */
