@@ -3,14 +3,9 @@ pipeline {
 
     environment { 
         SERVICE_NAME     = 'frontend'
-        ENV_LABEL        = 'dev'
         AWS_REGION       = 'ap-northeast-2'
-        ECR_REPO         = '794038223418.dkr.ecr.ap-northeast-2.amazonaws.com/dolpin-frontend'
         IMAGE_TAG        = "${env.BUILD_NUMBER}"
         ZIP_NAME         = "frontend-${env.BUILD_NUMBER}.zip"
-        S3_BUCKET        = "dev-dolpin-codedeploy-artifacts"
-        APP_NAME         = "frontend-dev-codedeploy-app"
-        DEPLOYMENT_GROUP = "frontend-dev-deployment-group"
     }
 
     stages {
@@ -47,13 +42,14 @@ pipeline {
         stage('Set Environment by Branch') {
             steps {
                 script {
-                    if (env.BRANCH == 'main') {
-                        // env.ENV_LABEL = 'prod'
-                        env.API_BASE_CRED_ID = 'NEXT_PUBLIC_API_BASE_PROD'
-                    } else {
-                        // env.ENV_LABEL = 'dev'
-                        env.API_BASE_CRED_ID = 'NEXT_PUBLIC_API_BASE_DEV'
-                    } 
+                    def isMain = (env.BRANCH == 'main')
+
+                    env.ENV_LABEL        = isMain ? 'prod' : 'dev'
+                    env.API_BASE_CRED_ID = isMain ? 'NEXT_PUBLIC_API_BASE_PROD' : 'NEXT_PUBLIC_API_BASE_DEV'
+                    env.ECR_REPO         = "794038223418.dkr.ecr.${env.AWS_REGION}.amazonaws.com/dolpin-frontend-${env.ENV_LABEL}"
+                    env.S3_BUCKET        = "${env.ENV_LABEL}-dolpin-codedeploy-artifacts"
+                    env.APP_NAME         = "frontend-${env.ENV_LABEL}-codedeploy-app"
+                    env.DEPLOYMENT_GROUP = "frontend-${env.ENV_LABEL}-deployment-group"
                 }
             }
         }
@@ -100,7 +96,10 @@ pipeline {
                     aws ecr get-login-password --region ${AWS_REGION} | \
                       docker login --username AWS --password-stdin ${ECR_REPO}
                     
-                    docker build -t ${ECR_REPO}:${IMAGE_TAG} .
+                    docker build \
+                      --build-arg NEXT_PUBLIC_API_BASE_URL=${env.API_BASE_URL} \
+                      --build-arg NEXT_PUBLIC_KAKAOMAP_KEY=${env.KAKAOMAP_KEY} \
+                      -t ${ECR_REPO}:${IMAGE_TAG} .
                     docker push ${ECR_REPO}:${IMAGE_TAG}
                     """
                 }
@@ -154,38 +153,38 @@ pipeline {
         }
     }
 
-    post {
-        success {
-            script {
-                if (env.BRANCH in ['main', 'dev']) {
-                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-                        discordSend description: """
-                        제목 : ${currentBuild.displayName}
-                        결과 : ${currentBuild.result}
-                        실행 시간 : ${currentBuild.duration / 1000}s
-                        """,
-                        link: env.BUILD_URL, result: currentBuild.currentResult,
-                        title: "${env.JOB_NAME} : ${currentBuild.displayName} 성공",
-                        webhookURL: "$DISCORD"
-                    }
-                }
-            }
-        }
-        failure {
-            script {
-                if (env.BRANCH in ['main', 'dev']) {
-                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-                        discordSend description: """
-                        제목 : ${currentBuild.displayName}
-                        결과 : ${currentBuild.result}
-                        실행 시간 : ${currentBuild.duration / 1000}s
-                        """,
-                        link: env.BUILD_URL, result: currentBuild.currentResult,
-                        title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패",
-                        webhookURL: "$DISCORD"
-                    }
-                }
-            }
-        }
-    }
+    // post {
+    //     success {
+    //         script {
+    //             if (env.BRANCH in ['main', 'dev']) {
+    //                 withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+    //                     discordSend description: """
+    //                     제목 : ${currentBuild.displayName}
+    //                     결과 : ${currentBuild.result}
+    //                     실행 시간 : ${currentBuild.duration / 1000}s
+    //                     """,
+    //                     link: env.BUILD_URL, result: currentBuild.currentResult,
+    //                     title: "${env.JOB_NAME} : ${currentBuild.displayName} 성공",
+    //                     webhookURL: "$DISCORD"
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     failure {
+    //         script {
+    //             if (env.BRANCH in ['main', 'dev']) {
+    //                 withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+    //                     discordSend description: """
+    //                     제목 : ${currentBuild.displayName}
+    //                     결과 : ${currentBuild.result}
+    //                     실행 시간 : ${currentBuild.duration / 1000}s
+    //                     """,
+    //                     link: env.BUILD_URL, result: currentBuild.currentResult,
+    //                     title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패",
+    //                     webhookURL: "$DISCORD"
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
