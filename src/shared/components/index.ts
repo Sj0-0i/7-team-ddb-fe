@@ -1,7 +1,6 @@
 export * from './bottom-navigation';
 export * from './header';
 export * from './toaster';
-export * from './alert-dialog';
 export * from './input';
 export * from './label';
 export * from './textarea';
@@ -17,3 +16,6 @@ export * from './switch';
 export * from './dropdown-menu';
 export * from './sheet';
 export * from './tab';
+export * from './loading-spinner';
+export * from './select';
+export * from './global-confirm-dialog';

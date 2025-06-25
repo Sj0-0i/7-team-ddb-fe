@@ -11,17 +11,19 @@ export interface Place {
   id: number;
   name: string;
   thumbnail: string;
-  distance: string;
-  moment_count: string;
+  distance: number;
+  moment_count: number;
+  similarity_score: number;
   keywords: string[];
   location: Location;
+  is_bookmarked: boolean;
 }
 
 export type PlaceListType = PlaceItemType[];
 
 export type PlaceItemType = Pick<
   Place,
-  'id' | 'name' | 'thumbnail' | 'keywords'
+  'id' | 'name' | 'thumbnail' | 'keywords' | 'is_bookmarked'
 >;
 
 export interface PlaceDetail {
@@ -38,6 +40,7 @@ export interface PlaceDetail {
   phone: string | null;
   menu?: Menu[];
   opening_hours: OpenHours;
+  is_bookmarked: boolean;
 }
 
 export interface OpenHours {
@@ -58,30 +61,3 @@ export interface Menu {
   name: string;
   price: number | null;
 }
-
-export const dummyPlaceItemData: PlaceListType = [
-  {
-    id: 1548136332,
-    name: 'CU 판교스페이스점',
-    thumbnail: 'https://cdn.dev.dolpin.site/place/1548136332.jpg',
-    keywords: ['편맥 추천', '야외 공간', '경기지역화폐'],
-  },
-  {
-    id: 1797985320,
-    name: 'GS25 판교스페이스점',
-    thumbnail: 'https://cdn.dev.dolpin.site/place/1797985320.jpg',
-    keywords: ['깔끔한 내부', '경기지역화폐'],
-  },
-  {
-    id: 1489570574,
-    name: 'GS25 판교H스퀘어점',
-    thumbnail: 'https://cdn.dev.dolpin.site/place/1489570574.jpg',
-    keywords: ['깔끔함', '경기지역화폐', '친절함'],
-  },
-  {
-    id: 19155729,
-    name: 'GS25 판교삼환점',
-    thumbnail: 'https://cdn.dev.dolpin.site/place/19155729.jpg',
-    keywords: ['포스트박스'],
-  },
-];

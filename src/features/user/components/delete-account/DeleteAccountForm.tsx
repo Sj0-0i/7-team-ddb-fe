@@ -6,15 +6,26 @@ import { useState } from 'react';
 import { deleteUser } from '../../api';
 
 import { Button } from '@/shared/components';
+import { useConfirmDialogStore } from '@/shared/store';
 
 export function DeleteAccountForm() {
   const router = useRouter();
-
+  const openDialog = useConfirmDialogStore((s) => s.openDialog);
   const [isAgreed, setIsAgreed] = useState(false);
 
   const handleDelete = async () => {
+    const ok = await openDialog({
+      title: '회원 탈퇴',
+      description: '회원 탈퇴를 진행하시겠습니까?',
+      confirmText: '탈퇴',
+      cancelText: '취소',
+      confirmButtonClassName: 'bg-destructive text-white',
+    });
+
+    if (!ok) return;
+
     await deleteUser();
-    router.push('/onboarding');
+    router.replace('/onboarding');
   };
 
   return (
@@ -55,9 +66,12 @@ export function DeleteAccountForm() {
           id="agree"
           checked={isAgreed}
           onChange={(e) => setIsAgreed(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
+          className="h-4 w-4 cursor-pointer rounded border-gray-300"
         />
-        <label htmlFor="agree" className="body-text text-gray-600">
+        <label
+          htmlFor="agree"
+          className="body-text cursor-pointer text-gray-600"
+        >
           위 내용을 모두 확인하였으며, 탈퇴에 동의합니다.
         </label>
       </div>

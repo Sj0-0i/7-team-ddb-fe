@@ -50,6 +50,7 @@ export function ProfileForm({
     handleImageChange,
     triggerInput,
     upload,
+    hasSelectedFile,
   } = useImageInput({
     form,
     fieldName: 'profile_image',
@@ -60,20 +61,20 @@ export function ProfileForm({
   const handleFormSubmit = async (data: ProfileFormValues) => {
     setIsSubmittingForm(true);
 
-    const uploadedImageUrl = await upload();
+    try {
+      const finalProfileImage = hasSelectedFile
+        ? ((await upload()) as string)
+        : data.profile_image || undefined;
 
-    if (uploadedImageUrl !== null) {
-      try {
-        await onSubmit({
-          ...data,
-          profile_image: uploadedImageUrl as string,
-        });
-      } catch (error) {
-        console.error('Form submission error:', error);
-      }
+      await onSubmit({
+        ...data,
+        profile_image: finalProfileImage,
+      });
+    } catch (error) {
+      console.error('Form submission error:', error);
+    } finally {
+      setIsSubmittingForm(false);
     }
-
-    setIsSubmittingForm(false);
   };
 
   return (

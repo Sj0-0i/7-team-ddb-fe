@@ -1,3 +1,6 @@
+import { cookies } from 'next/headers';
+
+import { PlaceMomentSection, WriteMomentFab } from '@/features/community';
 import {
   getPlaceDetail,
   PlaceBasicInfo,
@@ -14,8 +17,9 @@ export default async function PlaceDetailPage({
   params,
 }: PlaceDetailPageProps) {
   const { id } = await params;
+  const cookie = (await cookies()).toString();
 
-  const place = await getPlaceDetail(id);
+  const place = await getPlaceDetail({ placeId: id, cookie });
 
   if (!place) {
     return (
@@ -40,8 +44,10 @@ export default async function PlaceDetailPage({
           <PlaceBasicInfo placeBasicInfo={placeBasicInfo} />
           {!isOpenHoursEmpty && <PlaceOpenHours openHours={opening_hours} />}
           {!isMenuEmpty && <PlaceMenu menu={menu} />}
+          <PlaceMomentSection placeId={Number(id)} />
         </div>
       </div>
+      <WriteMomentFab place={place} />
     </div>
   );
 }
