@@ -112,6 +112,7 @@ pipeline {
                 mkdir -p deploy/scripts
                 cp -r appspec.yml deploy/
                 cp -r scripts/* deploy/scripts/
+                echo ${IMAGE_TAG} > deploy/.image_tag
                 cd deploy && zip -r ../${ZIP_NAME} .
                 '''
             }
@@ -141,12 +142,6 @@ pipeline {
                       --s3-location bucket=${S3_BUCKET},bundleType=zip,key=${ZIP_NAME} \
                       --region ${AWS_REGION} \
                       --file-exists-behavior OVERWRITE
-
-                    aws deploy create-deployment \
-                        --application-name backend-prod-codedeploy-app \
-                        --deployment-group-name backend-prod-deployment-group \
-                        --s3-location bucket=xxx,bundleType=zip,key=xxx \
-                        --deployment-config-name CodeDeployDefault.AllAtOnce
                     """
                 }
             }

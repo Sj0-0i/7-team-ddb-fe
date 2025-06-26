@@ -13,7 +13,7 @@ fi
 AWS_REGION="ap-northeast-2"
 ACCOUNT_ID=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep accountId | awk -F\" '{print $4}')
 REPO_NAME="dolpin-frontend-${DEPLOYMENT_GROUP_NAME##*-}"  # 예: dev 또는 prod
-IMAGE_TAG=$(basename /home/ubuntu/app/frontend-*.zip .zip | cut -d'-' -f2)
+IMAGE_TAG=$(cat /home/ubuntu/app/.image_tag)
 IMAGE="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}"
 
 aws ecr get-login-password --region "$AWS_REGION" | \
