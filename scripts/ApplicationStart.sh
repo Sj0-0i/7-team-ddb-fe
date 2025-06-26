@@ -2,9 +2,14 @@
 set -e
 
 IMAGE=$(cat /home/ubuntu/app/.image_ref)
+PORT=3000
+CONTAINER_NAME=frontend
 
-echo "▶ 새 컨테이너 실행: $IMAGE"
+echo "▶ 서비스 계정 인증 및 Docker 실행"
+echo "▶ 실행할 이미지: $IMAGE"
+
+# 컨테이너 실행
 docker run -d \
-  --name frontend \
-  -p 3000:3000 \
+  --name "$CONTAINER_NAME" \
+  -p "$PORT:$PORT" \
   "$IMAGE"
