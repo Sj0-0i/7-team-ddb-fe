@@ -1,15 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "▶ AWS CLI 설치 확인 및 ECR 로그인"
-if ! command -v aws &> /dev/null; then
-  echo "AWS CLI가 설치되어 있지 않아 설치합니다."
-  curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  unzip -q awscliv2.zip
-  sudo ./aws/install
-  rm -rf aws awscliv2.zip
-fi
-
+echo "▶ ECR 로그인"
 AWS_REGION="ap-northeast-2"
 ACCOUNT_ID=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep accountId | awk -F\" '{print $4}')
 ENV_NAME=$(echo "$DEPLOYMENT_GROUP_NAME" | cut -d'-' -f2)
