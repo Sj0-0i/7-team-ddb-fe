@@ -40,6 +40,7 @@ export function useImageUpload(): UseImageUploadResult {
         body: file,
         headers: {
           'Content-Type': file.type,
+          'x-amz-acl': 'bucket-owner-full-control',
         },
       });
 
