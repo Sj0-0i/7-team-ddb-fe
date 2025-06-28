@@ -15,7 +15,7 @@ pipeline {
                     env.ENV_LABEL = env.IS_MAIN ? 'prod' : 'dev'
                     env.API_BASE_CRED_ID = env.IS_MAIN ? 'NEXT_PUBLIC_API_BASE_PROD' : 'NEXT_PUBLIC_API_BASE_DEV'
                     env.ECR_REPO = "794038223418.dkr.ecr.${env.AWS_REGION}.amazonaws.com/dolpin-${env.SERVICE_NAME}-${env.ENV_LABEL}"
-                    env.S3_BUCKET = "${env.SERVICE_NAME}-${env.ENV_LABEL}-dolpin-codedeploy-artifacts"
+                    env.S3_BUCKET = "${env.ENV_LABEL}-dolpin-codedeploy-artifacts"
                     env.IMAGE_TAG = "${env.BUILD_NUMBER}"
                     env.ZIP_NAME = "${env.SERVICE_NAME}-${env.BUILD_NUMBER}.zip"
                     env.APP_NAME = "${env.SERVICE_NAME}-${env.ENV_LABEL}-codedeploy-app"
@@ -30,23 +30,23 @@ pipeline {
             }
         }
 
-        stage('Notify Before Start') {
-            when {
-                expression { env.BRANCH in ['main', 'dev'] }
-            }
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-                        discordSend(
-                            description: "🚀 빌드가 시작됩니다: ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치",
-                            link: env.BUILD_URL,
-                            title: "빌드 시작",
-                            webhookURL: "$DISCORD"
-                        )
-                    }
-                }
-            }
-        }
+        // stage('Notify Before Start') {
+        //     when {
+        //         expression { env.BRANCH in ['main', 'dev'] }
+        //     }
+        //     steps {
+        //         script {
+        //             withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+        //                 discordSend(
+        //                     description: "🚀 빌드가 시작됩니다: ${env.SERVICE_NAME} - ${env.BRANCH} 브랜치",
+        //                     link: env.BUILD_URL,
+        //                     title: "빌드 시작",
+        //                     webhookURL: "$DISCORD"
+        //                 )
+        //             }
+        //         }
+        //     }
+        // }
 
         stage('Load Secrets') {
             steps {
@@ -112,36 +112,36 @@ pipeline {
         }
     }
 
-    post {
-        success {
-            script {
-                if (env.BRANCH in ['main', 'dev']) {
-                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-                        discordSend description: """
-                        제목 : ${env.SERVICE_NAME}-${currentBuild.displayName} 빌드
-                        실행 시간 : ${currentBuild.duration / 1000}s
-                        """,
-                        link: env.BUILD_URL, result: currentBuild.currentResult,
-                        title: "${env.JOB_NAME} : ${currentBuild.displayName} 성공",
-                        webhookURL: "$DISCORD"
-                    }
-                }
-            }
-        }
-        failure {
-            script {
-                if (env.BRANCH in ['main', 'dev']) {
-                    withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-                        discordSend description: """
-                        제목 : ${env.SERVICE_NAME}-${currentBuild.displayName} 빌드
-                        실행 시간 : ${currentBuild.duration / 1000}s
-                        """,
-                        link: env.BUILD_URL, result: currentBuild.currentResult,
-                        title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패",
-                        webhookURL: "$DISCORD"
-                    }
-                }
-            }
-        }
-    }
+    // post {
+    //     success {
+    //         script {
+    //             if (env.BRANCH in ['main', 'dev']) {
+    //                 withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+    //                     discordSend description: """
+    //                     제목 : ${env.SERVICE_NAME}-${currentBuild.displayName} 빌드
+    //                     실행 시간 : ${currentBuild.duration / 1000}s
+    //                     """,
+    //                     link: env.BUILD_URL, result: currentBuild.currentResult,
+    //                     title: "${env.JOB_NAME} : ${currentBuild.displayName} 성공",
+    //                     webhookURL: "$DISCORD"
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     failure {
+    //         script {
+    //             if (env.BRANCH in ['main', 'dev']) {
+    //                 withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+    //                     discordSend description: """
+    //                     제목 : ${env.SERVICE_NAME}-${currentBuild.displayName} 빌드
+    //                     실행 시간 : ${currentBuild.duration / 1000}s
+    //                     """,
+    //                     link: env.BUILD_URL, result: currentBuild.currentResult,
+    //                     title: "${env.JOB_NAME} : ${currentBuild.displayName} 실패",
+    //                     webhookURL: "$DISCORD"
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
