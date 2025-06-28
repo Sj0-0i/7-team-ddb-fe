@@ -7,26 +7,34 @@ pipeline {
     }
 
     stages {
-        stage('Set Branch') {
-            steps {
-                script {
-                    env.BRANCH = env.BRANCH_NAME ?: env.GIT_BRANCH?.replaceFirst(/^origin\//, '')
-                    env.IS_MAIN = (env.BRANCH == 'main')
-                    env.ENV_LABEL = env.IS_MAIN ? 'prod' : 'dev'
-                    env.API_BASE_CRED_ID = env.IS_MAIN ? 'NEXT_PUBLIC_API_BASE_PROD' : 'NEXT_PUBLIC_API_BASE_DEV'
-                    env.ECR_REPO = "794038223418.dkr.ecr.${env.AWS_REGION}.amazonaws.com/dolpin-${env.SERVICE_NAME}-${env.ENV_LABEL}"
-                    env.S3_BUCKET = "${env.ENV_LABEL}-dolpin-codedeploy-artifacts"
-                    env.IMAGE_TAG = "${env.BUILD_NUMBER}"
-                    env.ZIP_NAME = "${env.SERVICE_NAME}-${env.BUILD_NUMBER}.zip"
-                    env.APP_NAME = "${env.SERVICE_NAME}-${env.ENV_LABEL}-codedeploy-app"
-                    env.DEPLOYMENT_GROUP = "${env.SERVICE_NAME}-${env.ENV_LABEL}-deployment-group"
-                }
-            }
-        }
-
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Set Branch') {
+            steps {
+                script {
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH?.replaceFirst(/^origin\//, '').trim()
+                    def isMain = (branch == 'main')
+                    def envLabel = isMain ? 'prod' : 'dev'
+
+                    env.BRANCH = branch
+                    env.ENV_LABEL = envLabel
+                    env.API_BASE_CRED_ID = isMain ? 'NEXT_PUBLIC_API_BASE_PROD' : 'NEXT_PUBLIC_API_BASE_DEV'
+                    env.ECR_REPO = "794038223418.dkr.ecr.${env.AWS_REGION}.amazonaws.com/dolpin-${env.SERVICE_NAME}-${envLabel}"
+                    env.S3_BUCKET = "${envLabel}-dolpin-codedeploy-artifacts"
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}"
+                    env.ZIP_NAME = "${env.SERVICE_NAME}-${env.BUILD_NUMBER}.zip"
+                    env.APP_NAME = "${env.SERVICE_NAME}-${envLabel}-codedeploy-app"
+                    env.DEPLOYMENT_GROUP = "${env.SERVICE_NAME}-${envLabel}-deployment-group"
+
+                    echo "BRANCH: ${env.BRANCH}"
+                    echo "API_BASE ${env.API_BASE_CRED_ID}"
+                    echo "ENV_LABEL: ${env.ENV_LABEL}"
+                    echo "ECR_REPO: ${env.ECR_REPO}"
+                }
             }
         }
 
@@ -79,13 +87,15 @@ pipeline {
 
         stage('Package for CodeDeploy') {
             steps {
-                sh '''
-                mkdir -p deploy/scripts
-                cp -r appspec.yml deploy/
-                cp -r scripts/* deploy/scripts/
-                echo ${env.IMAGE_TAG} > deploy/.image_tag
-                cd deploy && zip -r ../${env.ZIP_NAME} .
-                '''
+                script {
+                    sh """
+                    mkdir -p deploy/scripts
+                    cp -r appspec.yml deploy/
+                    cp -r scripts/* deploy/scripts/
+                    echo ${env.IMAGE_TAG} > deploy/.image_tag
+                    cd deploy && zip -r ../${env.ZIP_NAME} .
+                    """
+                }
             }
         }
 
