@@ -21,7 +21,7 @@ hooks:
       timeout: 60
       runas: root
 
-  AfterAllowTraffic:
+  ValidateService:
     - location: scripts/NotifyDiscord.sh
       timeout: 60
       runas: root
